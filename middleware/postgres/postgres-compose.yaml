@@ -1,0 +1,10 @@
+services:
+  postgres:
+    container_name: postgres
+    image: postgres:latest
+    environment:
+      - POSTGRES_USER=sonicvpp
+      - POSTGRES_PASSWORD=sonicvpp
+      - POSTGRES_DB=sonic
+    restart: always
+
