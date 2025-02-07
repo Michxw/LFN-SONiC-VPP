@@ -45,18 +45,27 @@ verbose() {
 #   None
 # Arguments:
 #   $2: name of the sriov interface
+#   $3: number of sriov interfaces
 ########################################
 
 adding_sriov_vfs_and_vlans() {
-
-
-# Add SRIOV VFs
-echo 4 > /sys/class/net/enp65s0f1/device/sriov_numvfs
-
-ip link set dev enp65s0f1 up vf 0 vlan 2132
-ip link set dev enp65s0f1 up vf 1 vlan 2121
-ip link set dev enp65s0f1 up vf 2 vlan 2133
-ip link set dev enp65s0f1 up vf 3 vlan 2134
+  
+  # Add SRIOV VFs
+  verbose "Creating SRIOV interfaces..."
+  if ! echo $3 > /sys/class/net/$2/device/sriov_numvfs; then
+    err "Failed creating SRIOV interfaces"
+    exit 1
+  fi
+  
+  verbose "Adding vlans to SRIOV interfaces..."
+  for i in $(seq 0 $(($3 - 1)))
+  do
+    VLAN_ID=$((100 + i))
+    if ! ip link set dev $2 up vf $i vlan $VLAN_ID; then
+      err "Failed adding vlan to SRIOV interface"
+      exit 1
+    fi
+  done
 
 }
 
@@ -65,18 +74,25 @@ ip link set dev enp65s0f1 up vf 3 vlan 2134
 # Globals:
 #   None
 # Arguments:
-#   None
+#   $2: prefix for veth interfaces
+#   $3: number of veth interfaces
 ########################################
 adding_veths() {
 
-# Adding veths
-sudo ip link add name veth_vpp1 type veth peer name vpp1
-sudo ip link add name veth_vpp2 type veth peer name vpp2
+  # Adding veths
+  verbose "Creating veth interfaces..."
+  for i in $(seq 0 $(($3 - 1)))
+  do
+    if ! sudo ip link add name ${2}_${i}_point_a type veth peer name ${2}_${i}_point_b; then
+      err "Failed creating veth interfaces"
+      exit 1
+    fi
+  done
 
 }
 
 #######################################
-# Adding the veths
+# Main function
 # Globals:
 #   None
 # Arguments:
