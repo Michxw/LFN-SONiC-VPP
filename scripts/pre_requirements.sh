@@ -119,7 +119,7 @@ setup_docker() {
 
   # Adding Docker repository to APT sources
   verbose "Adding Docker repository to APT sources..."
-  if ! echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null; then
+  if ! echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null; then
     err "Failed to add Docker repository"
     exit 1
   fi
@@ -141,11 +141,17 @@ setup_docker() {
   fi
 
   # Creating Docker group if it doesn't exist
+  verbose "Checking if Docker group exists..."
+  if ! getent group docker >/dev/null; then
   verbose "Creating Docker group..."
-  if ! sudo groupadd docker 2>/dev/null; then
-    err "Failed to create Docker group (might already exist)"
+  if ! sudo groupadd docker; then
+    err "Failed to create Docker group"
+    exit 1
   fi
-  
+  else
+  verbose "Docker group already exists. Skipping creation."
+  fi
+
   # Adding the current user to the Docker group
   verbose "Adding current user to the Docker group..."
   if ! sudo usermod -aG docker $USER; then
@@ -178,12 +184,21 @@ enable_vfio (){
     err "Failed to load vfio-pci module"
     exit 1
   fi
+  
+  # Ensuring #GRUB_CMDLINE_LINUX is uncomment
+  if grep -q "^#GRUB_CMDLINE_LINUX=" /etc/default/grub; then
+  verbose "Uncommenting and appending intel_iommu=on to GRUB_CMDLINE_LINUX..."
+    if ! sudo sed -i 's/^#GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="/' /etc/default/grub; then
+      err "Failed to uncomment GRUB configuration"
+      exit 1
+    fi
+  fi
 
   # Ensuring intel_iommu=on is set in GRUB configuration
   verbose "Checking and updating GRUB configuration..."
   if ! grep -q "intel_iommu=on" /etc/default/grub; then
     verbose "Appending intel_iommu=on to GRUB_CMDLINE_LINUX..."
-    if ! sudo sed -i 's/GRUB_CMDLINE_LINUX="[^"]*/& intel_iommu=on/' /etc/default/grub; then
+    if ! sudo sed -i 's/^GRUB_CMDLINE_LINUX="\s*\([^"]*\)"/GRUB_CMDLINE_LINUX="\1intel_iommu=on"/' /etc/default/grub; then
       err "Failed to update GRUB configuration"
       exit 1
     fi
@@ -210,9 +225,18 @@ enable_vfio (){
 
 increasing_hugepage(){
   
+  # Find the correct hugepages path
+  verbose "Finding hugepages hugepages-2048kB directory..."
+  local hugepages_path
+  hugepages_path=$(find /sys/devices/system/node/ -type d -name "hugepages-2048kB" 2>/dev/null | head -n 1)
+  if [ $? -ne 0 ]; then
+    err "Failed to locate hugepages-2048kB directory"
+    exit 1
+  fi
+
   # Configuring hugepages
   verbose "Setting hugepages to 20..."
-  if ! echo "20" | sudo tee /sys/devices/system/node/node0/hugepages/hugepages-2048576kB/hugepages-2048kB > /dev/null; then
+  if ! echo "20" | sudo tee "$HUGEPAGES_PATH/hugepages-2048kB" > /dev/null; then
     err "Failed to set hugepages"
     exit 1
   fi
@@ -232,12 +256,11 @@ main (){
   
   setup_ubuntu_packages || exit 1
 
-  setup_docker || exit 1
-
   enable_vfio  || exit 1
 
   increasing_hugepage || exit 1
-
+  
+  setup_docker || exit 1
 }
 
 # Running the main function
