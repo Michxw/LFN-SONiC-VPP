@@ -184,6 +184,13 @@ enable_vfio (){
     err "Failed to load vfio-pci module"
     exit 1
   fi
+
+  # enabling unsafe noiummu mode
+  verbose "Enabling unsafe noiommu mode..."
+  if ! echo 1 > /sys/module/vfio/parameters/enable_unsafe_noiommu_mode; then
+    err "Failed to enabling noiu"
+    exit 1
+  fi
   
   # Ensuring #GRUB_CMDLINE_LINUX is uncomment
   if grep -q "^#GRUB_CMDLINE_LINUX=" /etc/default/grub; then
@@ -213,34 +220,6 @@ enable_vfio (){
     exit 1
   fi
 
-}
-
-#######################################
-# Increasing devices hugepage size
-# Globals:
-#   None
-# Arguments:
-#   None
-########################################
-
-increasing_hugepage(){
-  
-  # Find the correct hugepages path
-  verbose "Finding hugepages hugepages-2048kB directory..."
-  local hugepages_path
-  hugepages_path=$(find /sys/devices/system/node/ -type d -name "hugepages-2048kB" 2>/dev/null | head -n 1)
-  if [ $? -ne 0 ]; then
-    err "Failed to locate hugepages-2048kB directory"
-    exit 1
-  fi
-
-  # Configuring hugepages
-  verbose "Setting hugepages to 20..."
-  if ! echo "20" | sudo tee "$HUGEPAGES_PATH/hugepages-2048kB" > /dev/null; then
-    err "Failed to set hugepages"
-    exit 1
-  fi
-  
 }
 
 #######################################

@@ -67,8 +67,9 @@ adding_sriov_vfs_and_vlans() {
   
   # Get the correct sriov_numvfs file
   verbose "Looking for sriov_numvfs file"
-  FILE=$(lshw -c network -businfo | grep $INT_NAME | awk '{print $1}' | awk -F "@" '{print $2}')
-  if [[ -z "$FILE" || "$FILE" == "" ]]; then
+  local file
+  file=$(lshw -c network -businfo | grep $INT_NAME | awk '{print $1}' | awk -F "@" '{print $2}')
+  if [[ -z "$file" || "$file" == "" ]]; then
     err "Interface not found"
     exit 1
   fi
@@ -80,11 +81,12 @@ adding_sriov_vfs_and_vlans() {
     exit 1
   fi
   
+  local vlan_id
   verbose "Adding vlans to SRIOV interfaces..."
   for i in $(seq 0 $(($INT_NUM - 1)))
   do
-    VLAN_ID=$((100 + i))
-    if ! ip link set dev $INT_NAME up vf $i vlan $VLAN_ID; then
+    vlan_id=$((100 + i))
+    if ! ip link set dev $INT_NAME up vf $i vlan $vlan_id; then
       err "Failed adding vlan to SRIOV interface"
       exit 1
     fi
@@ -115,6 +117,34 @@ adding_veths() {
 }
 
 #######################################
+# Increasing devices hugepage size
+# Globals:
+#   None
+# Arguments:
+#   None
+########################################
+
+increasing_hugepage(){
+  
+  # Find the correct hugepages path
+  verbose "Finding hugepages hugepages-2048kB directory..."
+  local hugepages_path
+  hugepages_path=$(find /sys/devices/system/node/ -type d -name "hugepages-2048kB" 2>/dev/null | head -n 1)
+  if [ $? -ne 0 ]; then
+    err "Failed to locate hugepages-2048kB directory"
+    exit 1
+  fi
+
+  # Configuring hugepages
+  verbose "Setting hugepages to 20..."
+  if ! echo "30" | sudo tee "$hugepages_path/nr_hugepages" > /dev/null; then
+    err "Failed to set hugepages"
+    exit 1
+  fi
+  
+}
+
+#######################################
 # Main function
 # Globals:
 #   None
@@ -122,6 +152,8 @@ adding_veths() {
 #   $1: Sriov or veths
 ########################################
 main (){
+
+  increasing_hugepage || exit 1
 
   if [[ $INT_TYPE == "sriov" ]]; then
     adding_sriov_vfs_and_vlans || exit 1
