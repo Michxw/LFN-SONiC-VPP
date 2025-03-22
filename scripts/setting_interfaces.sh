@@ -81,16 +81,16 @@ adding_sriov_vfs_and_vlans() {
     exit 1
   fi
   
-  local vlan_id
-  verbose "Adding vlans to SRIOV interfaces..."
-  for i in $(seq 0 $(($INT_NUM - 1)))
-  do
-    vlan_id=$((100 + i))
-    if ! ip link set dev $INT_NAME up vf $i vlan $vlan_id; then
-      err "Failed adding vlan to SRIOV interface"
-      exit 1
-    fi
-  done
+  #local vlan_id
+  #verbose "Adding vlans to SRIOV interfaces..."
+  #for i in $(seq 0 $(($INT_NUM - 1)))
+  #do
+  #  vlan_id=$((100 + i))
+  #  if ! ip link set dev $INT_NAME up vf $i vlan $vlan_id; then
+  #    err "Failed adding vlan to SRIOV interface"
+  #    exit 1
+  #  fi
+  #done
 
 }
 

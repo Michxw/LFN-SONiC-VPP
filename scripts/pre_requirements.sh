@@ -236,8 +236,6 @@ main (){
   setup_ubuntu_packages || exit 1
 
   enable_vfio  || exit 1
-
-  increasing_hugepage || exit 1
   
   setup_docker || exit 1
 }
